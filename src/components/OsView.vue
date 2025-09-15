@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 
 // --- Параметры из query ---
 const initSpeed = Number(route.query.speed || 1)   // тактов в секунду
@@ -18,6 +19,11 @@ const processTable = ref([])
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
+
+// --- Навигация ---
+function goToMainMenu() {
+  router.push('/')  // переход на уровень выше
+}
 
 // --- Инициализация ---
 function initModel() {
@@ -103,7 +109,14 @@ onUnmounted(() => {
 
 <template>
     <div class="panel os-panel">
+        
+        <div class="menu-btn" @click="goToMainMenu">
+            <span class="material-symbols-outlined" style="font-size: 1rem;">mode_off_on</span>
+        </div>
+        
         <h2>Модель ОС</h2>
+
+        <h3>Параметры:</h3>
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
         <p>Затраты ОС: {{ initCost }}</p>
@@ -125,7 +138,7 @@ onUnmounted(() => {
             </li>
         </ul>
 
-        <h3>Лог</h3>
+        <h3>Лог:</h3>
         <div class="log">
             <div v-for="(entry, i) in log" :key="i">{{ entry }}</div>
         </div>
@@ -133,7 +146,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+h2, h3 {
+    padding: 0.5rem 0;
+}
 .os-panel {
+    position: relative;
     height: 80vh;
     width: 80ch;
     padding: 1rem;
@@ -147,7 +164,33 @@ onUnmounted(() => {
     border-radius: 5px;
     border: 1px solid rgba(97, 97, 97, 0.3);
     background: rgba(60, 60, 60, 0.6);
+    color: rgb(200, 200, 200);
+    cursor: pointer;
+    font-family: "Comfortaa", "Open Sans", sans-serif;
     margin: 0.25rem;
+}
+
+.controls button:hover {
+    color: white;
+}   
+
+.menu-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 10px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(97, 97, 97, 0.3);
+    background: rgba(60, 60, 60, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: rgb(200, 200, 200);
+    cursor: pointer;
+}
+
+.menu-btn:hover {
+    color: white;
 }
 
 .log {

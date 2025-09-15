@@ -1,14 +1,31 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const osSpeed = ref(100)
 const osMemory = ref(1000)
 const osCost = ref(2)
 
+const minSpeed = 10
+const maxSpeed = 1000
+const minMemory = 500
+const maxMemory = 5000  
+const minCost = 1
+const maxCost = 10
+
 const router = useRouter()
 
 function startOS() {
+  // Проверим все диапазоны перед запуском
+  if (
+    !checkRange(osSpeed.value, minSpeed, maxSpeed) ||
+    !checkRange(osMemory.value, minMemory, maxMemory) ||
+    !checkRange(osCost.value, minCost, maxCost)
+  ) {
+    alert('Проверьте введённые значения — они должны быть в диапазонах!')
+    return
+  }
+
   router.push({
     name: 'OS',
     query: {
@@ -18,6 +35,16 @@ function startOS() {
     }
   })
 }
+
+// --- Функция проверки диапазона ---
+function checkRange(value, min, max) {
+  return value >= min && value <= max
+}
+
+// --- Для применения стилей создадим вычисляемые классы ---
+const speedClass = computed(() => checkRange(osSpeed.value, minSpeed, maxSpeed) ? '' : 'out-of-range')
+const memoryClass = computed(() => checkRange(osMemory.value, minMemory, maxMemory) ? '' : 'out-of-range')
+const costClass = computed(() => checkRange(osCost.value, minCost, maxCost) ? '' : 'out-of-range')
 </script>
 
 <template>
@@ -37,7 +64,7 @@ function startOS() {
             <span class="material-symbols-outlined" style="font-size: 1rem;">speed</span>
             Скорость
           </div>
-          <input v-model="osSpeed" type="number" placeholder="100" class="param-input"/>
+          <input v-model="osSpeed" type="number" class="param-input" :class="speedClass"/>
         </div>
       </div>
 
@@ -52,7 +79,7 @@ function startOS() {
             <span class="material-symbols-outlined" style="font-size: 1rem;">memory</span>
             Память
           </div>
-          <input v-model="osMemory" type="number" placeholder="1000" class="param-input"/>
+          <input v-model="osMemory" type="number" class="param-input" :class="memoryClass"/>
         </div>
       </div>
 
@@ -67,7 +94,7 @@ function startOS() {
             <span class="material-symbols-outlined" style="font-size: 1rem;">paid</span>
             Затраты ОС
           </div>
-          <input v-model="osCost" type="number" placeholder="2" class="param-input"/>
+          <input v-model="osCost" type="number" class="param-input" :class="costClass"/>
         </div>
       </div>
     </div>
@@ -107,6 +134,17 @@ function startOS() {
   border: 1px solid rgba(97, 97, 97, 0.3);
   border-radius: 15px;
   background: rgba(40, 40, 40, 0.5);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.param:hover {
+  transform: translateY(-5px);
+  box-shadow: 2px 4px 5px rgba(97, 97, 97, 0.2);
+}
+
+.param-input.out-of-range {
+  color: red;
+  border: 1px solid rgb(167, 67, 67);
 }
 
 /* Строки */
@@ -180,5 +218,6 @@ function startOS() {
 }
 .start-btn:hover {
   background: rgba(100, 100, 100, 0.6);
+  color: white;
 }
 </style>
