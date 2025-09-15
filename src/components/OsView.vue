@@ -137,18 +137,26 @@ onUnmounted(() => {
     height: 80vh;
     width: 80ch;
     padding: 1rem;
+    background-color: rgba(23, 23, 23, 0.6);
+    color: rgb(200, 200, 200);
+    box-shadow: 5px 5px 10px rgba(97, 97, 97, 0.2);
 }
 
 .controls button {
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: 1px solid rgba(97, 97, 97, 0.3);
+    background: rgba(60, 60, 60, 0.6);
     margin: 0.25rem;
 }
 
 .log {
-    border: 1px solid #ccc;
+    border: 1px solid rgba(97, 97, 97, 0.3);
+    border-radius: 10px;
     padding: 0.5rem;
     height: 200px;
     overflow-y: auto;
-    background: #fafafa;
+    background: rgba(40, 40, 40, 0.5);
     font-size: 0.9em;
 }
 </style>
