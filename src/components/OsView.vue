@@ -20,9 +20,14 @@ const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
 
+// RR параметры
+const quantum = 50              // квант времени (в тактах)
+const currentQuantum = ref(0)  // оставшийся квант
+let currentProcess = null       // активный процесс
+
 // --- Навигация ---
 function goToMainMenu() {
-  router.push('/')  // переход на уровень выше
+  router.push('/')
 }
 
 // --- Инициализация ---
@@ -31,20 +36,23 @@ function initModel() {
     usedMemory.value = 0
     processTable.value = []
     log.value.push('Модель ОС инициализирована')
+    currentProcess = null
+    currentQuantum.value = 0
 }
 
 // --- Генерация нового задания ---
 function generateTask() {
     const task = {
         id: Date.now(),
-        memory: Math.floor(Math.random() * 200) + 50,  // 50–250
+        memory: Math.floor(Math.random() * 200) + 50,   // 50–250
         pc: 0,
-        ticksRequired: Math.floor(Math.random() * 500) + 250 ///250-750
+        ticksRequired: Math.floor(Math.random() * 500) + 250, // 250–750
+        priority: Math.floor(Math.random() * 5) + 1     // приоритет 1–5
     }
     if (hasMemory(task.memory) && processTable.value.length < 10) {
         processTable.value.push(task)
         usedMemory.value += task.memory
-        log.value.push(`Задание id=${task.id} загружено (mem=${task.memory}, ticks=${task.ticksRequired})`)
+        log.value.push(`Задание id=${task.id} загружено (mem=${task.memory}, ticks=${task.ticksRequired}, prio=${task.priority})`)
     } else {
         log.value.push(`Нет ресурсов(памяти) для задания id=${task.id}`)
     }
@@ -53,24 +61,57 @@ function generateTask() {
 // --- Проверка памяти ---
 function hasMemory(size) {
     return usedMemory.value + size <= totalMemory.value
-
 }
 
-// --- Такт ОС (последовательно) ---
+// --- Очистка лога ---
+function clearLog() {
+    log.value = []
+}
+
+// --- Выбор следующего процесса ---
+function scheduleNext() {
+    if (processTable.value.length === 0) {
+        currentProcess = null
+        return
+    }
+
+    // выбираем процесс с макс. приоритетом
+    processTable.value.sort((a, b) => b.priority - a.priority)
+
+    currentProcess = processTable.value.shift()  // снимаем с очереди
+    currentQuantum.value = quantum
+    /*log.value.push(`Процесс ${currentProcess.id} выбран для выполнения (prio=${currentProcess.priority})`)
+*/
+}
+
+// --- Такт ОС ---
 function tick() {
-  if (processTable.value.length === 0) return
+    if (!currentProcess) {
+        scheduleNext()
+        return
+    }
 
-  const active = processTable.value[0] // всегда первый
-  active.pc++
-  active.ticksRequired--
-  commandCounter.value++
+    currentProcess.pc++
+    currentProcess.ticksRequired--
+    currentQuantum.value--
+    commandCounter.value++
 
-  if (active.ticksRequired === 0) {
-    // Завершение
-    usedMemory.value -= active.memory
-    processTable.value.shift()
-    log.value.push(`Процесс ${active.id} завершён, память освобождена`)
-  }
+    if (currentProcess.ticksRequired <= 0) {
+        // Завершение
+        usedMemory.value -= currentProcess.memory
+        log.value.push(`Процесс ${currentProcess.id} завершён, память освобождена`)
+        currentProcess = null
+    } else if (currentQuantum.value <= 0) {
+        // Квант истёк → отправляем в конец очереди
+        processTable.value.push(currentProcess)
+        /*log.value.push(`Квант процесса ${currentProcess.id} истёк, возвращён в очередь`)
+        */
+       currentProcess = null
+    }
+
+    if (!currentProcess) {
+        scheduleNext()
+    }
 }
 
 // --- Управление моделированием ---
@@ -107,6 +148,7 @@ onUnmounted(() => {
 })
 </script>
 
+
 <template>
     <div class="panel os-panel">
         
@@ -119,7 +161,7 @@ onUnmounted(() => {
         <h3>Параметры:</h3>
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
-        <p>Затраты ОС: {{ initCost }}</p>
+        <!--<p>Затраты ОС: {{ initCost }}</p>-->
         <p>Счётчик команд: {{ commandCounter }}</p>
 
         <h3>Управление</h3>
@@ -129,14 +171,39 @@ onUnmounted(() => {
             <button @click="adjustSpeed(1.1)">Увеличить скорость</button>
             <button @click="adjustSpeed(0.9)">Уменьшить скорость</button>
             <button @click="generateTask">Сгенерировать задание</button>
+            <button @click="clearLog">Очистить лог</button>
         </div>
 
-        <h3>Таблица процессов</h3>
-        <ul>
-            <li v-for="task in processTable" :key="task.id">
-                id={{ task.id }}, mem={{ task.memory }}, pc={{ task.pc }}, осталось={{ task.ticksRequired }}
-            </li>
-        </ul>
+        <h3>Таблица активных процессов:</h3>
+        <table class="process-table">
+        <thead>
+            <tr>
+            <th>Имя (id)</th>
+            <th>Память</th>
+            <th>Выполнено тактов</th>
+            <th>Осталось тактов</th>
+            <th>Приоритет</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Текущий процесс -->
+            <tr v-if="currentProcess" class="current-process">
+            <td>{{ currentProcess.id }}</td>
+            <td>{{ currentProcess.memory }}</td>
+            <td>{{ currentProcess.pc }}</td>
+            <td>{{ currentProcess.ticksRequired }}</td>
+            <td>{{ currentProcess.priority }}</td>
+            </tr>
+            <!-- Остальные процессы -->
+            <tr v-for="task in processTable" :key="task.id">
+            <td>{{ task.id }}</td>
+            <td>{{ task.memory }}</td>
+            <td>{{ task.pc }}</td>
+            <td>{{ task.ticksRequired }}</td>
+            <td>{{ task.priority }}</td>
+            </tr>
+        </tbody>
+        </table>
 
         <h3>Лог:</h3>
         <div class="log">
@@ -159,6 +226,12 @@ h2, h3 {
     box-shadow: 5px 5px 10px rgba(97, 97, 97, 0.2);
 }
 
+.controls {
+    display: grid;
+    grid-template-columns: repeat(2, 250px);
+    
+}
+
 .controls button {
     padding: 8px 12px;
     border-radius: 5px;
@@ -174,6 +247,17 @@ h2, h3 {
     color: white;
 }   
 
+.process-table {
+    padding: 8px 8px;
+}
+
+.process-table li {
+    padding-left: 1rem;
+}
+
+li::marker{
+    margin-left: 1rem;
+}
 .menu-btn {
     position: absolute;
     top: 10px;
@@ -202,4 +286,50 @@ h2, h3 {
     background: rgba(40, 40, 40, 0.5);
     font-size: 0.9em;
 }
+
+.process-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  background: rgba(40, 40, 40, 0.5);
+  border: 1px solid rgba(97, 97, 97, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.process-table thead {
+  background: rgba(60, 60, 60, 0.7);
+}
+
+.process-table th,
+.process-table td {
+  border: 1px solid rgba(97, 97, 97, 0.3);
+  padding: 6px 10px;
+  text-align: center;
+  color: rgb(200, 200, 200);
+}
+
+.process-table th {
+  font-weight: bold;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(220, 220, 220);
+}
+
+.process-table tbody tr:nth-child(even) {
+  background: rgba(30, 30, 30, 0.4);
+}
+
+.process-table tbody tr:hover {
+  background: rgba(80, 80, 80, 0.4);
+}
+
+.process-table .current-process {
+  background: rgba(100, 150, 250, 0.2);
+  font-weight: bold;
+  color: rgb(230, 230, 255);
+}
+
 </style>
