@@ -5,6 +5,7 @@ import App from './App.vue'
 import StartView from './components/StartView.vue'
 import OsView from './components/OsView.vue'
 
+
 const app = createApp(App)
 
 const router = createRouter({
