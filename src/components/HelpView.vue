@@ -39,12 +39,16 @@ function handleBackdropClick(e) {
     <dialog ref="dialogRef" class="help-dialog" @click="handleBackdropClick" @close="emit('closeHelp')">
         <div class="help-content">
             <h2>Помощь</h2>
-            <p>Это окно справки для модели ОС. Здесь можно разместить краткие пояснения:</p>
+            
+            <h3>Вариант обработчика</h3>
+            <p>18. RR + относительные приоритеты, одна очередь готовых процессов</p>
+            
+            <h3>Выполнение операций</h3>
             <ul>
                 <li><strong>Запустить/Остановить ОС</strong> — управление симуляцией.</li>
+                <li><strong>Увеличить/Уменьшить скорость</strong> — регулировка количества тактов в секунду.</li>
                 <li><strong>Сгенерировать задание</strong> — добавить новый процесс в очередь.</li>
-                <li><strong>Скорость</strong> — регулирует количество тактов в секунду.</li>
-                <li><strong>Таблица процессов</strong> — отображает активные процессы и их состояние.</li>
+                <li><strong>Очистить лог</strong> — удаление всех сообщений в блоке лог</li>
             </ul>
             <div class="help-footer">
                 <button @click="emit('closeHelp')">Закрыть</button>
@@ -54,6 +58,15 @@ function handleBackdropClick(e) {
 </template>
 
 <style scoped>
+h2 {
+    text-align: center;
+    padding-bottom: 0.5rem;    
+}
+
+p {
+    padding: 0.5rem 0rem;
+}
+
 .help-dialog {
     position: fixed;
     top: 50%;
@@ -68,13 +81,15 @@ function handleBackdropClick(e) {
     width: 80%;
     box-shadow: 0 0 25px rgba(0, 0, 0, 0.8);
     font-family: "Comfortaa", "Open Sans", sans-serif;
+    cursor: default;
 }
 
 .help-dialog::backdrop {
     background: rgba(0, 0, 0, 0.6);
+    cursor: pointer;
 }
 
-.help-content h2 {
+.help-content h2, h3 {
     margin-top: 0;
     color: rgb(255, 255, 255);
 }
