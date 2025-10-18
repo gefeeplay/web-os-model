@@ -7,9 +7,8 @@ const route = useRoute()
 const router = useRouter()
 
 // --- Параметры из query ---
-const initSpeed = Number(route.query.speed || 1)   // тактов в секунду
+const initSpeed = Number(route.query.speed || 1)
 const initMemory = Number(route.query.memory || 1000)
-const initCost = Number(route.query.cost || 1)
 
 // --- Состояние модели ---
 const commandCounter = ref(0)
@@ -17,14 +16,14 @@ const currentSpeed = ref(initSpeed)
 const totalMemory = ref(initMemory)
 const usedMemory = ref(0)
 const processTable = ref([])
+const completedTable = ref([]) // ✅ добавили таблицу завершенных процессов
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
 
-// RR параметры
-const quantum = 50              // квант времени (в тактах)
-const currentQuantum = ref(0)  // оставшийся квант
-let currentProcess = null       // активный процесс
+const quantum = 50
+const currentQuantum = ref(0)
+let currentProcess = null
 
 // --- Навигация ---
 function goToMainMenu() {
@@ -36,6 +35,7 @@ function initModel() {
     commandCounter.value = 0
     usedMemory.value = 0
     processTable.value = []
+    completedTable.value = []
     log.value.push('Модель ОС инициализирована')
     currentProcess = null
     currentQuantum.value = 0
@@ -45,11 +45,11 @@ function initModel() {
 function generateTask() {
     const task = {
         id: Date.now(),
-        memory: Math.floor(Math.random() * 200) + 50,   // 50–250
+        memory: Math.floor(Math.random() * 200) + 50,
         pc: 0,
-        ticksRequired: Math.floor(Math.random() * 500) + 250, // 250–750
-        priority: Math.floor(Math.random() * 5) + 1,    // приоритет 1–5
-        state: 'Ожидание'                                  // Состояние
+        ticksRequired: Math.floor(Math.random() * 500) + 250,
+        priority: Math.floor(Math.random() * 5) + 1,
+        state: 'Ожидание'
     }
     if (hasMemory(task.memory) && processTable.value.length < 10) {
         processTable.value.push(task)
@@ -60,7 +60,6 @@ function generateTask() {
     }
 }
 
-// --- Проверка памяти ---
 function hasMemory(size) {
     return usedMemory.value + size <= totalMemory.value
 }
@@ -70,25 +69,34 @@ function clearLog() {
     log.value = []
 }
 
-// --- Выбор следующего процесса ---
+// --- Планировщик ---
 function scheduleNext() {
     if (processTable.value.length === 0) {
         currentProcess = null
         return
     }
 
-    // выбираем процесс с макс. приоритетом
-    processTable.value.sort((a, b) => b.priority - a.priority)
+    // игнорируем приостановленные
+    const readyProcesses = processTable.value.filter(p => p.state !== 'Приостановлен')
+    if (readyProcesses.length === 0) {
+        currentProcess = null
+        return
+    }
 
-    currentProcess = processTable.value.shift()
-    currentProcess.state = 'Выполняется'       // <— отмечаем активный
+    readyProcesses.sort((a, b) => b.priority - a.priority)
+    const nextProcess = readyProcesses.shift()
+    processTable.value = processTable.value.filter(p => p.id !== nextProcess.id)
+
+    nextProcess.state = 'Выполняется'
+    currentProcess = nextProcess
     currentQuantum.value = quantum
 
-    // остальные остаются в состоянии "Ожидание"
-    processTable.value.forEach(p => p.state = 'Ожидание')
+    processTable.value.forEach(p => {
+        if (p.state === 'Выполняется') p.state = 'Ожидание'
+    })
 }
 
-// --- Такт ОС ---
+// --- Такт ---
 function tick() {
     if (!currentProcess) {
         scheduleNext()
@@ -101,18 +109,18 @@ function tick() {
     commandCounter.value++
 
     if (currentProcess.ticksRequired <= 0) {
+        currentProcess.state = 'Выполнен'
+        completedTable.value.push(currentProcess)
         usedMemory.value -= currentProcess.memory
         log.value.push(`Процесс ${currentProcess.id} завершён, память освобождена`)
         currentProcess = null
     } else if (currentQuantum.value <= 0) {
-        currentProcess.state = 'Готов'
+        currentProcess.state = 'Ожидание'
         processTable.value.push(currentProcess)
         currentProcess = null
     }
 
-    if (!currentProcess) {
-        scheduleNext()
-    }
+    if (!currentProcess) scheduleNext()
 }
 
 // --- Управление моделированием ---
@@ -138,6 +146,31 @@ function adjustSpeed(factor) {
     log.value.push(`Скорость изменена: ${currentSpeed.value.toFixed(2)} такт/с`)
 }
 
+// --- Новые функции действий ---
+function pauseProcess(task) {
+    if (task.state === 'Выполняется') {
+        // если текущий процесс приостанавливают — сбросить
+        currentProcess = null
+    }
+    task.state = 'Приостановлен'
+    log.value.push(`Процесс ${task.id} приостановлен`)
+}
+
+function terminateProcess(task) {
+    // удалить из списка активных, память вернуть
+    usedMemory.value -= task.memory
+    task.state = 'Удален'
+    completedTable.value.push(task)
+    processTable.value = processTable.value.filter(p => p.id !== task.id)
+    log.value.push(`Процесс ${task.id} завершён вручную`)
+    if (currentProcess && currentProcess.id === task.id) currentProcess = null
+}
+
+function deleteCompleted(task) {
+    completedTable.value = completedTable.value.filter(p => p.id !== task.id)
+    log.value.push(`Процесс ${task.id} удалён из списка завершённых`)
+}
+
 // --- Жизненный цикл ---
 onMounted(() => {
     initModel()
@@ -148,11 +181,7 @@ onUnmounted(() => {
     stopSimulation()
 })
 
-
-//--- vue ---
-
 const showHelp = ref(false)
-
 </script>
 
 
@@ -160,11 +189,10 @@ const showHelp = ref(false)
     <div class="panel os-panel">
 
         <div class="btn help" @click="showHelp = true">
-            <span class="material-symbols-outlined" style="font-size: 1rem;">
-                question_mark
-            </span>
+            <span class="material-symbols-outlined" style="font-size: 1rem;">question_mark</span>
             <HelpView :showHelp="showHelp" @closeHelp="showHelp = false" />
         </div>
+
         <div class="btn menu" @click="goToMainMenu">
             <span class="material-symbols-outlined" style="font-size: 1rem;">mode_off_on</span>
         </div>
@@ -174,7 +202,6 @@ const showHelp = ref(false)
         <h3>Параметры:</h3>
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
-        <!--<p>Затраты ОС: {{ initCost }}</p>-->
         <p>Счётчик команд: {{ commandCounter }}</p>
 
         <h3>Управление</h3>
@@ -196,7 +223,8 @@ const showHelp = ref(false)
                     <th>Выполнено тактов</th>
                     <th>Осталось тактов</th>
                     <th>Приоритет</th>
-                    <th>Состояние</th> <!-- Новый столбец -->
+                    <th>Состояние</th>
+                    <th>Действия</th>
                 </tr>
             </thead>
             <tbody>
@@ -208,6 +236,14 @@ const showHelp = ref(false)
                     <td>{{ currentProcess.ticksRequired }}</td>
                     <td>{{ currentProcess.priority }}</td>
                     <td>{{ currentProcess.state }}</td>
+                    <td>
+                        <button @click="pauseProcess(currentProcess)">
+                            <span class="material-symbols-outlined">pause</span>
+                        </button>
+                        <button @click="terminateProcess(currentProcess)">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </td>
                 </tr>
 
                 <!-- Остальные процессы -->
@@ -218,6 +254,42 @@ const showHelp = ref(false)
                     <td>{{ task.ticksRequired }}</td>
                     <td>{{ task.priority }}</td>
                     <td>{{ task.state }}</td>
+                    <td>
+                        <button @click="pauseProcess(task)">
+                            <span class="material-symbols-outlined">pause</span>
+                        </button>
+                        <button @click="terminateProcess(task)">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Таблица завершённых процессов:</h3>
+        <table class="process-table">
+            <thead>
+                <tr>
+                    <th>Имя (id)</th>
+                    <th>Память</th>
+                    <th>Выполнено тактов</th>
+                    <th>Приоритет</th>
+                    <th>Состояние</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="task in completedTable" :key="task.id">
+                    <td>{{ task.id }}</td>
+                    <td>{{ task.memory }}</td>
+                    <td>{{ task.pc }}</td>
+                    <td>{{ task.priority }}</td>
+                    <td>{{ task.state }}</td>
+                    <td>
+                        <button @click="deleteCompleted(task)">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -229,6 +301,7 @@ const showHelp = ref(false)
     </div>
 </template>
 
+
 <style scoped>
 h2,
 h3 {
@@ -237,13 +310,30 @@ h3 {
 
 .os-panel {
     position: relative;
-    height: 80vh;
-    width: 80ch;
+    width: 50rem;
     padding: 1rem;
+    border-radius: 1rem;
     background-color: rgba(23, 23, 23, 0.6);
     color: rgb(200, 200, 200);
     box-shadow: 5px 5px 10px rgba(97, 97, 97, 0.2);
+    max-height: 90vh;
+    overflow-y: auto;
 }
+
+.os-panel::-webkit-scrollbar {
+    display: none;
+    width: 8px;
+}
+
+.os-panel::-webkit-scrollbar-thumb {
+    background: rgba(100, 100, 100, 0.4);
+    border-radius: 4px;
+}
+
+.os-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(150, 150, 150, 0.6);
+}
+
 
 .controls {
     display: grid;
@@ -272,6 +362,17 @@ h3 {
 
 .process-table li {
     padding-left: 1rem;
+}
+
+.process-table button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgb(200, 200, 200);
+}
+
+.process-table button:hover {
+    color: #fff;
 }
 
 li::marker {
