@@ -16,7 +16,7 @@ const currentSpeed = ref(initSpeed)
 const totalMemory = ref(initMemory)
 const usedMemory = ref(0)
 const processTable = ref([])
-const completedTable = ref([]) // ✅ добавили таблицу завершенных процессов
+const completedTable = ref([]) // ✅ таблица завершенных процессов
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
@@ -24,6 +24,12 @@ const log = ref([])
 const quantum = 50
 const currentQuantum = ref(0)
 let currentProcess = null
+
+// --- Команды процессора ---
+const commandList = [
+    { name: "Арифметическая операция", code: 0 },
+    { name: "Вывод строки в консоль", code: 1 },
+]
 
 // --- Навигация ---
 function goToMainMenu() {
@@ -49,7 +55,8 @@ function generateTask() {
         pc: 0,
         ticksRequired: Math.floor(Math.random() * 500) + 250,
         priority: Math.floor(Math.random() * 5) + 1,
-        state: 'Ожидание'
+        state: 'Ожидание',
+        currentCommand: null,
     }
     if (hasMemory(task.memory) && processTable.value.length < 10) {
         processTable.value.push(task)
@@ -64,9 +71,48 @@ function hasMemory(size) {
     return usedMemory.value + size <= totalMemory.value
 }
 
-// --- Очистка лога ---
-function clearLog() {
-    log.value = []
+// --- Командные функции ---
+function generateCommand(process) {
+    const randomCommand = commandList[Math.floor(Math.random() * commandList.length)]
+    process.currentCommand = randomCommand
+    log.value.push(`Процесс ${process.id}: сгенерирована команда "${randomCommand.name}" (код ${randomCommand.code})`)
+}
+
+function decodeCommand(process) {
+    if (!process.currentCommand) return null
+    const command = process.currentCommand
+    log.value.push(`Процесс ${process.id}: разбор команды "${command.name}", код ${command.code}`)
+    return command.code
+}
+
+function executeCommand(process) {
+    const code = decodeCommand(process)
+    if (code === 0) {
+        const a = Math.floor(Math.random() * 10)
+        const b = Math.floor(Math.random() * 10)
+        const result = a + b
+        log.value.push(`Процесс ${process.id}: выполнена арифметическая операция ${a} + ${b} = ${result}`)
+    } else if (code === 1) {
+        const text = ["Привет, мир!", "Процесс работает", "Операция завершена", "Итерация цикла"].sort(() => 0.5 - Math.random())[0]
+        log.value.push(`Процесс ${process.id}: вывод в консоль — "${text}"`)
+    }
+    writeResultToMemory(process)
+}
+
+function writeResultToMemory(process) {
+    log.value.push(`Процесс ${process.id}: результат операции записан в память`)
+}
+
+function initIOProcessor() {
+    log.value.push("Инициализация процессора ввода/вывода завершена")
+}
+
+function finishTask(process) {
+    process.state = "Выполнен"
+    completedTable.value.push(process)
+    usedMemory.value -= process.memory
+    log.value.push(`Процесс ${process.id} завершён, память освобождена`)
+    currentProcess = null
 }
 
 // --- Планировщик ---
@@ -76,7 +122,6 @@ function scheduleNext() {
         return
     }
 
-    // игнорируем приостановленные
     const readyProcesses = processTable.value.filter(p => p.state !== 'Приостановлен')
     if (readyProcesses.length === 0) {
         currentProcess = null
@@ -108,16 +153,16 @@ function tick() {
     currentQuantum.value--
     commandCounter.value++
 
+    // ✅ Если квант завершился — выполнить команду процесса
+    if (currentQuantum.value <= 0) {
+        generateCommand(currentProcess)
+        executeCommand(currentProcess)
+        currentQuantum.value = quantum // новый квант
+    }
+
+    // Проверяем завершение
     if (currentProcess.ticksRequired <= 0) {
-        currentProcess.state = 'Выполнен'
-        completedTable.value.push(currentProcess)
-        usedMemory.value -= currentProcess.memory
-        log.value.push(`Процесс ${currentProcess.id} завершён, память освобождена`)
-        currentProcess = null
-    } else if (currentQuantum.value <= 0) {
-        currentProcess.state = 'Ожидание'
-        processTable.value.push(currentProcess)
-        currentProcess = null
+        finishTask(currentProcess)
     }
 
     if (!currentProcess) scheduleNext()
@@ -149,7 +194,6 @@ function adjustSpeed(factor) {
 // --- Новые функции действий ---
 function pauseProcess(task) {
     if (task.state === 'Выполняется') {
-        // если текущий процесс приостанавливают — сбросить
         currentProcess = null
     }
     task.state = 'Приостановлен'
@@ -157,7 +201,6 @@ function pauseProcess(task) {
 }
 
 function terminateProcess(task) {
-    // удалить из списка активных, память вернуть
     usedMemory.value -= task.memory
     task.state = 'Удален'
     completedTable.value.push(task)
@@ -174,6 +217,7 @@ function deleteCompleted(task) {
 // --- Жизненный цикл ---
 onMounted(() => {
     initModel()
+    initIOProcessor()
     startSimulation()
 })
 
@@ -224,6 +268,7 @@ const showHelp = ref(false)
                     <th>Осталось тактов</th>
                     <th>Приоритет</th>
                     <th>Состояние</th>
+                    <th>Текущая операция</th>
                     <th>Действия</th>
                 </tr>
             </thead>
@@ -236,6 +281,10 @@ const showHelp = ref(false)
                     <td>{{ currentProcess.ticksRequired }}</td>
                     <td>{{ currentProcess.priority }}</td>
                     <td>{{ currentProcess.state }}</td>
+                    <td>
+                        {{ currentProcess.currentCommand?.name || '-' }} 
+                        ({{ currentProcess.currentCommand?.code ?? '-' }})
+                    </td>
                     <td>
                         <button @click="pauseProcess(currentProcess)">
                             <span class="material-symbols-outlined">pause</span>
@@ -254,6 +303,10 @@ const showHelp = ref(false)
                     <td>{{ task.ticksRequired }}</td>
                     <td>{{ task.priority }}</td>
                     <td>{{ task.state }}</td>
+                    <td>
+                        {{ task.currentCommand?.name || '-' }}
+                        ({{ task.currentCommand?.code ?? '-' }})
+                    </td>
                     <td>
                         <button @click="pauseProcess(task)">
                             <span class="material-symbols-outlined">pause</span>
@@ -310,7 +363,7 @@ h3 {
 
 .os-panel {
     position: relative;
-    width: 50rem;
+    width: 70rem;
     padding: 1rem;
     border-radius: 1rem;
     background-color: rgba(23, 23, 23, 0.6);
