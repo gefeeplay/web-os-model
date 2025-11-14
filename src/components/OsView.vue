@@ -11,15 +11,16 @@ const initSpeed = Number(route.query.speed || 1)
 const initMemory = Number(route.query.memory || 1000)
 
 // --- Состояние модели ---
-const commandCounter = ref(0)
+const taktCounter = ref(0)
 const currentSpeed = ref(initSpeed)
 const totalMemory = ref(initMemory)
 const usedMemory = ref(0)
 const processTable = ref([])
-const completedTable = ref([]) // ✅ таблица завершенных процессов
+const completedTable = ref([]) // таблица завершенных процессов
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
+const taskCounter = ref(0) // счетчик заданий процессора ввода/вывода
 
 const quantum = 50
 const currentQuantum = ref(0)
@@ -38,7 +39,7 @@ function goToMainMenu() {
 
 // --- Инициализация ---
 function initModel() {
-    commandCounter.value = 0
+    taktCounter.value = 0
     usedMemory.value = 0
     processTable.value = []
     completedTable.value = []
@@ -78,6 +79,7 @@ function generateCommand(process) {
     log.value.push(`Процесс ${process.id}: сгенерирована команда "${randomCommand.name}" (код ${randomCommand.code})`)
 }
 
+//Разбор кода задачи
 function decodeCommand(process) {
     if (!process.currentCommand) return null
     const command = process.currentCommand
@@ -85,6 +87,7 @@ function decodeCommand(process) {
     return command.code
 }
 
+//Выполнение задачи
 function executeCommand(process) {
     const code = decodeCommand(process)
     if (code === 0) {
@@ -93,20 +96,34 @@ function executeCommand(process) {
         const result = a + b
         log.value.push(`Процесс ${process.id}: выполнена арифметическая операция ${a} + ${b} = ${result}`)
     } else if (code === 1) {
-        const text = ["Привет, мир!", "Процесс работает", "Операция завершена", "Итерация цикла"].sort(() => 0.5 - Math.random())[0]
-        log.value.push(`Процесс ${process.id}: вывод в консоль — "${text}"`)
+        IOProccesor(process);
     }
     writeResultToMemory(process)
+}
+
+function IOProccesor(process){
+    taskCounter.value +=1;
+    executeIOCommand(process);
+    currentQuantum.value--
+}
+
+// выполнение задачи ввода/вывода
+function executeIOCommand(process) {
+    const text = ["Привет, мир!", "Процесс работает", "Операция завершена", "Итерация цикла"].sort(() => 0.5 - Math.random())[0]
+    log.value.push(`Процесс ${process.id}: вывод в консоль — "${text}"`)
 }
 
 function writeResultToMemory(process) {
     log.value.push(`Процесс ${process.id}: результат операции записан в память`)
 }
 
+//Инициализация процессора ввода/вывода
 function initIOProcessor() {
     log.value.push("Инициализация процессора ввода/вывода завершена")
+    taskCounter.value = 0;
 }
 
+//Завершить процесс
 function finishTask(process) {
     process.state = "Выполнен"
     completedTable.value.push(process)
@@ -151,9 +168,9 @@ function tick() {
     currentProcess.pc++
     currentProcess.ticksRequired--
     currentQuantum.value--
-    commandCounter.value++
+    taktCounter.value++
 
-    // ✅ Если квант завершился — выполнить команду процесса
+    //  Если квант завершился — выполнить команду процесса
     if (currentQuantum.value <= 0) {
         generateCommand(currentProcess)
         executeCommand(currentProcess)
@@ -191,7 +208,7 @@ function adjustSpeed(factor) {
     log.value.push(`Скорость изменена: ${currentSpeed.value.toFixed(2)} такт/с`)
 }
 
-// --- Новые функции действий ---
+// --- функции действий (кнопок)---
 function pauseProcess(task) {
     if (task.state === 'Выполняется') {
         currentProcess = null
@@ -209,6 +226,7 @@ function terminateProcess(task) {
     if (currentProcess && currentProcess.id === task.id) currentProcess = null
 }
 
+//Удаление выполненого процесса
 function deleteCompleted(task) {
     completedTable.value = completedTable.value.filter(p => p.id !== task.id)
     log.value.push(`Процесс ${task.id} удалён из списка завершённых`)
@@ -246,7 +264,8 @@ const showHelp = ref(false)
         <h3>Параметры:</h3>
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
-        <p>Счётчик команд: {{ commandCounter }}</p>
+        <p>Счётчик тактов: {{ taktCounter }}</p>
+        <p>Счётчик задач процессора IO: {{ taskCounter }}</p>
 
         <h3>Управление</h3>
         <div class="controls">
