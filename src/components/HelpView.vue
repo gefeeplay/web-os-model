@@ -42,6 +42,7 @@ function handleBackdropClick(e) {
             
             <h3>Вариант обработчика</h3>
             <p>18. RR + относительные приоритеты, одна очередь готовых процессов</p>
+            <h3>Язык управления: JavaScript (Vue)</h3>
             
             <h3>Выполнение операций</h3>
             <ul>
@@ -63,7 +64,7 @@ h2 {
     padding-bottom: 0.5rem;    
 }
 
-p {
+p, h3 {
     padding: 0.5rem 0rem;
 }
 

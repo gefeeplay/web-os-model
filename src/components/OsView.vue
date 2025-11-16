@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HelpView from './HelpView.vue'
 
@@ -12,6 +12,7 @@ const initMemory = Number(route.query.memory || 1000)
 
 // --- Состояние модели ---
 const taktCounter = ref(0)
+const idleTicks = ref(0) // простои ЦП
 const currentSpeed = ref(initSpeed)
 const totalMemory = ref(initMemory)
 const usedMemory = ref(0)
@@ -55,10 +56,14 @@ function generateTask() {
         memory: Math.floor(Math.random() * 200) + 50,
         pc: 0,
         ticksRequired: Math.floor(Math.random() * 500) + 250,
+        ticksTotal: 0,
         priority: Math.floor(Math.random() * 5) + 1,
         state: 'Ожидание',
         currentCommand: null,
     }
+
+    task.ticksTotal = task.ticksRequired
+
     if (hasMemory(task.memory) && processTable.value.length < 10) {
         processTable.value.push(task)
         usedMemory.value += task.memory
@@ -67,6 +72,19 @@ function generateTask() {
         log.value.push(`Нет ресурсов(памяти) для задания id=${task.id}`)
     }
 }
+
+// Подсчет средних значений
+const avgTicks = computed(() => {
+    if (completedTable.value.length === 0) return 0
+    const sum = completedTable.value.reduce((acc, p) => acc + p.ticksTotal, 0)
+    return Math.round(sum / completedTable.value.length)
+})
+// Процент производительности системы
+const cpuUtilization = computed(() => {
+    const total = taktCounter.value + idleTicks.value
+    if (total === 0) return 0
+    return ((taktCounter.value / total) * 100).toFixed(2)
+})
 
 function hasMemory(size) {
     return usedMemory.value + size <= totalMemory.value
@@ -101,6 +119,7 @@ function executeCommand(process) {
     writeResultToMemory(process)
 }
 
+//Процессор ввода/вывода
 function IOProccesor(process){
     taskCounter.value +=1;
     executeIOCommand(process);
@@ -160,7 +179,10 @@ function scheduleNext() {
 
 // --- Такт ---
 function tick() {
+    
+    //Если нет процесса — ЦП простаивает
     if (!currentProcess) {
+        idleTicks.value++
         scheduleNext()
         return
     }
@@ -266,6 +288,10 @@ const showHelp = ref(false)
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
         <p>Счётчик тактов: {{ taktCounter }}</p>
         <p>Счётчик задач процессора IO: {{ taskCounter }}</p>
+
+        <h3></h3>
+        <p>Производительность: {{ cpuUtilization }} %</p>
+        <p>Среднее значение необходимых тактов: {{ avgTicks }}</p>
 
         <h3>Управление</h3>
         <div class="controls">
