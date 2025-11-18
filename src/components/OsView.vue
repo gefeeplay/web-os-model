@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HelpView from './HelpView.vue'
+import ChangeOsMemory from './ChangeOsMemory.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +25,9 @@ const completedTable = ref([]) // таблица завершенных проц
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
+const isAutoTaskGenerate = ref(false)
+let autoTaskInterval = null //интервал для генерации
+const showMemoryDialog = ref(false); //диалоговое окно для изменения памяти
 
 const taskCounter = ref(0)
 const systemTicks = ref(0) // счетчик системных тактов
@@ -80,6 +84,10 @@ function generateTask() {
     }
 }
 
+// --- Очистка лога --- 
+function clearLog() { 
+    log.value = [] 
+}
 // Проверка доступной памяти
 function hasMemory(size) {
     return usedMemory.value + size <= totalMemory.value
@@ -259,10 +267,16 @@ function pauseProcess(task) {
     if (task.state === 'Выполняется') {
         currentProcess = null
     }
+
+    if (task.state === 'Приостановлен'){
+        task.state = 'Ожидание'
+        return
+    }
     task.state = 'Приостановлен'
     log.value.push(`Процесс ${task.id} приостановлен`)
 }
 
+//Принудительное завершение актинвого процесса
 function terminateProcess(task) {
     usedMemory.value -= task.memory
     task.state = 'Удален'
@@ -272,10 +286,35 @@ function terminateProcess(task) {
     if (currentProcess && currentProcess.id === task.id) currentProcess = null
 }
 
-//Удаление выполненого процесса
+//Удаление завершенного процесса
 function deleteCompleted(task) {
     completedTable.value = completedTable.value.filter(p => p.id !== task.id)
     log.value.push(`Процесс ${task.id} удалён из списка завершённых`)
+}
+
+//Включение/выключение автогенерации процессов
+function toggleAutoTaskGeneration() {
+    isAutoTaskGenerate.value = !isAutoTaskGenerate.value
+
+    if (isAutoTaskGenerate.value) {
+        log.value.push("Автоматическая генерация заданий включена")
+
+        autoTaskInterval = setInterval(() => {
+            generateTask()
+        }, 3000) // каждые 3 секунд
+    } else {
+        log.value.push("Автоматическая генерация заданий выключена")
+
+        if (autoTaskInterval) {
+            clearInterval(autoTaskInterval)
+            autoTaskInterval = null
+        }
+    }
+}
+
+//Для изменения памяти
+function updateMemory(val) {
+    totalMemory.value = val;
 }
 
 // --- Жизненный цикл ---
@@ -287,6 +326,10 @@ onMounted(() => {
 
 onUnmounted(() => {
     stopSimulation()
+
+    if (autoTaskInterval) {
+        clearInterval(autoTaskInterval)
+    }
 })
 
 const showHelp = ref(false)
@@ -310,6 +353,7 @@ const showHelp = ref(false)
         <h3>Параметры:</h3>
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
+        <p>Автогенерация процессов: {{ isAutoTaskGenerate }}</p>
         <p>Счётчик тактов: {{ taktCounter }}</p>
 
         <h3></h3>
@@ -320,12 +364,15 @@ const showHelp = ref(false)
 
         <h3>Управление</h3>
         <div class="controls">
-            <button @click="stopSimulation">Остановить ОС</button>
             <button @click="startSimulation">Запустить ОС</button>
             <button @click="adjustSpeed(1.1)">Увеличить скорость</button>
-            <button @click="adjustSpeed(0.9)">Уменьшить скорость</button>
             <button @click="generateTask">Сгенерировать задание</button>
+            <button @click="toggleAutoTaskGeneration">{{ isAutoTaskGenerate ? 'Выключить авто-генерацию' : 'Включить авто-генерацию' }}</button>
+
+            <button @click="stopSimulation">Остановить ОС</button>
+            <button @click="adjustSpeed(0.9)">Уменьшить скорость</button>
             <button @click="clearLog">Очистить лог</button>
+            <button @click="showMemoryDialog = true">Изменить размер памяти</button>
         </div>
 
         <h3>Таблица активных процессов:</h3>
@@ -422,6 +469,9 @@ const showHelp = ref(false)
             <div v-for="(entry, i) in log" :key="i">{{ entry }}</div>
         </div>
     </div>
+
+    <!-- Диалоговое окно изменения памяти -->
+    <ChangeOsMemory v-model="showMemoryDialog" :currentMemory="totalMemory" @changeMemory="updateMemory" />
 </template>
 
 
@@ -460,7 +510,7 @@ h3 {
 
 .controls {
     display: grid;
-    grid-template-columns: repeat(2, 250px);
+    grid-template-columns: repeat(4, 200px);
 
 }
 

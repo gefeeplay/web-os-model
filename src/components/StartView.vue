@@ -10,7 +10,7 @@ const osMinOfRange = ref(100)
 const minSpeed = 10
 const maxSpeed = 1000
 const minMemory = 500
-const maxMemory = 5000  
+const maxMemory = 5000
 const minOfRange = 100
 const maxOfRange = 1000
 
@@ -76,7 +76,7 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
             <span class="material-symbols-outlined" style="font-size: 1rem;">speed</span>
             Скорость
           </div>
-          <input v-model="osSpeed" type="number" class="param-input" :class="speedClass"/>
+          <input v-model="osSpeed" type="number" class="param-input" :class="speedClass" />
         </div>
       </div>
 
@@ -91,7 +91,7 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
             <span class="material-symbols-outlined" style="font-size: 1rem;">memory</span>
             Память
           </div>
-          <input v-model="osMemory" type="number" class="param-input" :class="memoryClass"/>
+          <input v-model="osMemory" type="number" class="param-input" :class="memoryClass" />
         </div>
       </div>
 
@@ -106,8 +106,8 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
             <span class="material-symbols-outlined" style="font-size: 1rem;">height</span>
             Размер процесса
           </div>
-          <input v-model="osMinOfRange" type="number" class="param-input" :class="minClass"/>
-          <input v-model="osMaxOfRange" type="number" class="param-input" :class="maxClass"/>
+          <input v-model="osMinOfRange" type="number" class="param-input" :class="minClass" />
+          <input v-model="osMaxOfRange" type="number" class="param-input" :class="maxClass" />
         </div>
       </div>
     </div>
@@ -155,6 +155,24 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
   box-shadow: 2px 4px 5px rgba(97, 97, 97, 0.2);
 }
 
+.param-input {
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(97, 97, 97, 0.3);
+  background: rgba(60, 60, 60, 0.6);
+  color: white;
+  font-family: "Comfortaa", "Open Sans", sans-serif;
+  font-weight: bold;
+  width: 5rem;
+  text-align: end;
+}
+
+.param-input::-webkit-inner-spin-button,
+.param-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .param-input.out-of-range {
   color: red;
   border: 1px solid rgb(167, 67, 67);
@@ -191,32 +209,15 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
 .param-title {
   font-weight: 600;
 }
+
 .param-label {
   padding: 6px 10px;
 }
+
 .param-range {
   width: 5rem;
   text-align: end;
   padding: 6px 4px;
-}
-
-
-.param-input {
-  padding: 8px 4px;
-  border-radius: 10px;
-  border: 1px solid rgba(97, 97, 97, 0.3);
-  background: rgba(60, 60, 60, 0.6);
-  color: white;
-  font-family: "Comfortaa", "Open Sans", sans-serif;
-  font-weight: bold;
-  width: 5rem;
-  text-align: end;
-}
-
-.param-input::-webkit-inner-spin-button,
-.param-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 /* Кнопка */
@@ -229,6 +230,7 @@ const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 
   background: rgba(60, 60, 60, 0.6);
   transition: 0.2s;
 }
+
 .start-btn:hover {
   background: rgba(100, 100, 100, 0.6);
   color: white;
