@@ -9,6 +9,9 @@ const router = useRouter()
 // --- Параметры из query ---
 const initSpeed = Number(route.query.speed || 1)
 const initMemory = Number(route.query.memory || 1000)
+const initMinRange = Number(route.query.minOfRange || 100)
+const initMaxRange = Number(route.query.maxOfRange || 300)
+
 
 // --- Состояние модели ---
 const taktCounter = ref(0)
@@ -57,7 +60,7 @@ function initModel() {
 function generateTask() {
     const task = {
         id: Date.now(),
-        memory: Math.floor(Math.random() * 200) + 50,
+        memory: Math.floor(Math.random() * (initMaxRange - initMinRange + 1)) + initMinRange,
         pc: 0,
         ticksRequired: Math.floor(Math.random() * 500) + 250,
         ticksTotal: 0,

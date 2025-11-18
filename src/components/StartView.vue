@@ -4,14 +4,15 @@ import { useRouter } from 'vue-router'
 
 const osSpeed = ref(100)
 const osMemory = ref(1000)
-const osCost = ref(2)
+const osMaxOfRange = ref(300)
+const osMinOfRange = ref(100)
 
 const minSpeed = 10
 const maxSpeed = 1000
 const minMemory = 500
 const maxMemory = 5000  
-const minCost = 1
-const maxCost = 10
+const minOfRange = 100
+const maxOfRange = 1000
 
 const router = useRouter()
 
@@ -20,7 +21,8 @@ function startOS() {
   if (
     !checkRange(osSpeed.value, minSpeed, maxSpeed) ||
     !checkRange(osMemory.value, minMemory, maxMemory) ||
-    !checkRange(osCost.value, minCost, maxCost)
+    !checkMax(osMaxOfRange.value, maxOfRange) ||
+    !checkMin(osMinOfRange.value, minOfRange)
   ) {
     alert('Проверьте введённые значения — они должны быть в диапазонах!')
     return
@@ -31,7 +33,8 @@ function startOS() {
     query: {
       speed: osSpeed.value,
       memory: osMemory.value,
-      cost: osCost.value
+      minOfRange: osMinOfRange.value,
+      maxOfRange: osMaxOfRange.value
     }
   })
 }
@@ -41,10 +44,19 @@ function checkRange(value, min, max) {
   return value >= min && value <= max
 }
 
+function checkMax(value, max) {
+  return value <= max
+}
+
+function checkMin(value, min) {
+  return value >= min
+}
+
 // --- Для применения стилей создадим вычисляемые классы ---
 const speedClass = computed(() => checkRange(osSpeed.value, minSpeed, maxSpeed) ? '' : 'out-of-range')
 const memoryClass = computed(() => checkRange(osMemory.value, minMemory, maxMemory) ? '' : 'out-of-range')
-const costClass = computed(() => checkRange(osCost.value, minCost, maxCost) ? '' : 'out-of-range')
+const minClass = computed(() => checkMin(osMinOfRange.value, minOfRange) ? '' : 'out-of-range')
+const maxClass = computed(() => checkMax(osMaxOfRange.value, maxOfRange) ? '' : 'out-of-range')
 </script>
 
 <template>
@@ -71,7 +83,7 @@ const costClass = computed(() => checkRange(osCost.value, minCost, maxCost) ? ''
       <!-- Память -->
       <div class="param">
         <div class="param-row small">
-          <div class="param-label">Диапазон, МБ</div>
+          <div class="param-label">Диапазон, усл.ед.</div>
           <div class="param-range">500 – 5000</div>
         </div>
         <div class="param-row big">
@@ -87,14 +99,15 @@ const costClass = computed(() => checkRange(osCost.value, minCost, maxCost) ? ''
       <div class="param">
         <div class="param-row small">
           <div class="param-label">Диапазон, усл.ед.</div>
-          <div class="param-range">1 – 10</div>
+          <div class="param-range">100 - 1000</div>
         </div>
         <div class="param-row big">
           <div class="param-title">
-            <span class="material-symbols-outlined" style="font-size: 1rem;">paid</span>
-            Затраты ОС
+            <span class="material-symbols-outlined" style="font-size: 1rem;">height</span>
+            Размер процесса
           </div>
-          <input v-model="osCost" type="number" class="param-input" :class="costClass"/>
+          <input v-model="osMinOfRange" type="number" class="param-input" :class="minClass"/>
+          <input v-model="osMaxOfRange" type="number" class="param-input" :class="maxClass"/>
         </div>
       </div>
     </div>
