@@ -12,17 +12,18 @@ const initMemory = Number(route.query.memory || 1000)
 
 // --- Состояние модели ---
 const taktCounter = ref(0)
-const idleTicks = ref(0) // простои ЦП
 const currentSpeed = ref(initSpeed)
 const totalMemory = ref(initMemory)
 const usedMemory = ref(0)
 const processTable = ref([])
 const completedTable = ref([]) // таблица завершенных процессов
+
 const isRunning = ref(false)
 const intervalId = ref(null)
 const log = ref([])
-const taskCounter = ref(0) // счетчик заданий процессора ввода/вывода
 
+const taskCounter = ref(0)
+const systemTicks = ref(0) // счетчик системных тактов
 const quantum = 50
 const currentQuantum = ref(0)
 let currentProcess = null
@@ -47,6 +48,9 @@ function initModel() {
     log.value.push('Модель ОС инициализирована')
     currentProcess = null
     currentQuantum.value = 0
+    systemTicks.value = 0
+    taskCounter.value = 0
+
 }
 
 // --- Генерация нового задания ---
@@ -73,22 +77,30 @@ function generateTask() {
     }
 }
 
+// Проверка доступной памяти
+function hasMemory(size) {
+    return usedMemory.value + size <= totalMemory.value
+}
+
 // Подсчет средних значений
 const avgTicks = computed(() => {
     if (completedTable.value.length === 0) return 0
     const sum = completedTable.value.reduce((acc, p) => acc + p.ticksTotal, 0)
     return Math.round(sum / completedTable.value.length)
 })
-// Процент производительности системы
-const cpuUtilization = computed(() => {
-    const total = taktCounter.value + idleTicks.value
-    if (total === 0) return 0
-    return ((taktCounter.value / total) * 100).toFixed(2)
-})
 
-function hasMemory(size) {
-    return usedMemory.value + size <= totalMemory.value
-}
+// Процент производительности системы
+
+// Накладные расходы ОС = все переключения задачи (каждый квант)
+const systemOverhead = computed(() => systemTicks.value)
+
+// Производительность системы
+const cpuPerformance = computed(() => {
+    const single = taktCounter.value
+    const overhead = systemOverhead.value
+    if (single + overhead === 0) return 0
+    return ((single / (single + overhead)) * 100).toFixed(2)
+})
 
 // --- Командные функции ---
 function generateCommand(process) {
@@ -117,11 +129,12 @@ function executeCommand(process) {
         IOProccesor(process);
     }
     writeResultToMemory(process)
+    taskCounter.value += 1
 }
 
 //Процессор ввода/вывода
-function IOProccesor(process){
-    taskCounter.value +=1;
+function IOProccesor(process) {
+    systemTicks.value += 1;
     executeIOCommand(process);
     currentQuantum.value--
 }
@@ -130,6 +143,7 @@ function IOProccesor(process){
 function executeIOCommand(process) {
     const text = ["Привет, мир!", "Процесс работает", "Операция завершена", "Итерация цикла"].sort(() => 0.5 - Math.random())[0]
     log.value.push(`Процесс ${process.id}: вывод в консоль — "${text}"`)
+    systemTicks.value += 1
 }
 
 function writeResultToMemory(process) {
@@ -139,7 +153,7 @@ function writeResultToMemory(process) {
 //Инициализация процессора ввода/вывода
 function initIOProcessor() {
     log.value.push("Инициализация процессора ввода/вывода завершена")
-    taskCounter.value = 0;
+    systemTicks.value = 0;
 }
 
 //Завершить процесс
@@ -164,6 +178,8 @@ function scheduleNext() {
         return
     }
 
+    systemTicks.value++
+
     readyProcesses.sort((a, b) => b.priority - a.priority)
     const nextProcess = readyProcesses.shift()
     processTable.value = processTable.value.filter(p => p.id !== nextProcess.id)
@@ -179,13 +195,18 @@ function scheduleNext() {
 
 // --- Такт ---
 function tick() {
-    
-    //Если нет процесса — ЦП простаивает
+
     if (!currentProcess) {
-        idleTicks.value++
         scheduleNext()
         return
     }
+
+    //процессы в очереди на выполнение → увеличивают задержку
+    processTable.value.forEach(p => {
+        if (p.state === 'Ожидание' || p.state === 'Приостановлен') {
+            systemTicks.value++
+        }
+    })
 
     currentProcess.pc++
     currentProcess.ticksRequired--
@@ -196,7 +217,7 @@ function tick() {
     if (currentQuantum.value <= 0) {
         generateCommand(currentProcess)
         executeCommand(currentProcess)
-        currentQuantum.value = quantum // новый квант
+        currentQuantum.value = quantum
     }
 
     // Проверяем завершение
@@ -287,10 +308,11 @@ const showHelp = ref(false)
         <p>Скорость: {{ currentSpeed.toFixed(2) }} такт/с</p>
         <p>Память: {{ usedMemory }} / {{ totalMemory }}</p>
         <p>Счётчик тактов: {{ taktCounter }}</p>
-        <p>Счётчик задач процессора IO: {{ taskCounter }}</p>
 
         <h3></h3>
-        <p>Производительность: {{ cpuUtilization }} %</p>
+        <p>Производительность: {{ cpuPerformance }} %</p>
+        <p>Количество заданий: {{ taskCounter }}</p>
+        <p>Количество системных тактов: {{ systemTicks }}</p>
         <p>Среднее значение необходимых тактов: {{ avgTicks }}</p>
 
         <h3>Управление</h3>
@@ -327,7 +349,7 @@ const showHelp = ref(false)
                     <td>{{ currentProcess.priority }}</td>
                     <td>{{ currentProcess.state }}</td>
                     <td>
-                        {{ currentProcess.currentCommand?.name || '-' }} 
+                        {{ currentProcess.currentCommand?.name || '-' }}
                         ({{ currentProcess.currentCommand?.code ?? '-' }})
                     </td>
                     <td>
